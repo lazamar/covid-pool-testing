@@ -8,8 +8,8 @@ import math
 rcParams['font.family'] = 'serif'
 linewidth=0.9
 
-# naive binary - worst case scenario with binary distribution
-def naive_binary(n):
+# Worst case scenario with binary distribution
+def worst_case_binary(n):
     # max nodes on the path from the root to infected leaves
     def atLevel(level, infected):
         levelNodes = math.pow(2, level)
@@ -50,6 +50,7 @@ def naive_binary(n):
                 + ' subjects'
     )
     ax.grid()
+    fig.savefig("plots/worst-case-binary.png")
     plt.show()
 
-naive_binary(1000)
+worst_case_binary(1024)
