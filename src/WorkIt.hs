@@ -13,5 +13,8 @@ createTree :: Int -> Int -> Tree Condition
 createTree arity leafCount = chunkIt $ take leafCount $ fmap Leaf conditions
     where
         chunkIt (root:[]) = root
-        chunkIt nodes = chunkIt $ fmap Node $ chunksOf arity nodes
+        chunkIt nodes = chunkIt $ fmap toNode $ chunksOf arity nodes
+
+        toNode (root:[]) = root
+        toNode nodes = Node nodes
 
