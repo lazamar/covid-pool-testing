@@ -124,3 +124,41 @@ instance Strategy OddStrategy where
            then return (Just condition)
            else return Nothing
     test tree = return $ fold tree
+
+
+-------------------------------------------------------------------------------
+
+data GenericTree a = GNode a [GenericTree a]
+    deriving (Functor)
+
+drawResult :: ResultTree -> String
+drawResult =  drawGenericTree . fmap showTest . resultToGeneric
+    where
+        resultToGeneric :: ResultTree -> GenericTree (Maybe Condition)
+        resultToGeneric (RNode c forest) = GNode c $ fmap resultToGeneric forest
+        resultToGeneric (RLeaf c       ) = GNode c []
+
+        showTest Nothing  = "Untested"
+        showTest (Just c) = "Tested " <> show c
+
+
+drawTree :: Show a => Tree a -> String
+drawTree =  drawGenericTree . treeToGeneric . fmap show
+    where
+        treeToGeneric :: Tree String -> GenericTree String
+        treeToGeneric (Node forest) = GNode "" $ fmap treeToGeneric forest
+        treeToGeneric (Leaf c     ) = GNode c []
+
+drawGenericTree :: GenericTree String -> String
+drawGenericTree = unlines . draw
+    where
+        draw :: GenericTree String -> [String]
+        draw (GNode x ts0) = lines x ++ drawSubTrees ts0
+          where
+            drawSubTrees [] = []
+            drawSubTrees [t] =
+                "|" : shift "`- " "   " (draw t)
+            drawSubTrees (t:ts) =
+                "|" : shift "+- " "|  " (draw t) ++ drawSubTrees ts
+
+            shift first other = zipWith (++) (first : repeat other)
