@@ -11,7 +11,7 @@ import Data.Foldable (fold)
 import Data.Functor.Identity (Identity, runIdentity)
 import Control.Monad (void)
 import Control.Monad.State (State)
-import Data.Tree (Tree(..), drawTree)
+import Data.Tree (Tree(..))
 
 import qualified Control.Monad.State as State
 
@@ -93,8 +93,9 @@ noop :: Monad m => a -> m ()
 noop _ = return ()
 
 -------------------------------------------------------------------------------
--- Strategy to test all leaves and test no intermediary nodes.
+-- Strategies
 
+-- A strategy to test all leaves and test no intermediary nodes.
 newtype TestLeaves a = TestLeaves (Identity a)
     deriving (Eq, Show)
     deriving newtype (Applicative, Monad, Functor)
@@ -108,9 +109,7 @@ instance Strategy TestLeaves where
            then RunTest noop
            else SkipTest
 
--------------------------------------------------------------------------------
--- Strategy to test only nodes at odd level numbers
-
+-- A strategy to test only nodes at odd level numbers
 newtype OddStrategy a = OddStrategy (State Int a)
     deriving newtype (Applicative, Functor, Monad, State.MonadState Int)
 
@@ -124,22 +123,4 @@ instance Strategy OddStrategy where
         return $ if odd index
            then RunTest noop
            else SkipTest
-
--------------------------------------------------------------------------------
-
-data GenericTree a = GNode a [GenericTree a]
-    deriving (Functor)
-
-drawResult :: ResultTree -> String
-drawResult = drawTree . fmap showTest
-    where
-        showTest Nothing  = "Untested"
-        showTest (Just c) = "Tested " <> show c
-
-drawLeafTree :: Show a => LeafTree a -> String
-drawLeafTree  =  drawTree . toTree . fmap show
-    where
-        toTree :: LeafTree String -> Tree String
-        toTree (LNode forest) = Node "" $ fmap toTree forest
-        toTree (Leaf c      ) = Node c []
 
