@@ -38,12 +38,6 @@ data ResultTree
     | RLeaf (Maybe Condition)
     deriving (Show, Eq)
 
-
-data EvaluationMode
-    = Sequential
-    | Parallel
-    deriving (Show, Eq)
-
 data Info = Info
     { arity :: Int
     , poolSize :: Int
@@ -54,7 +48,6 @@ newtype Arity = Arity Int
     deriving (Show, Eq)
 
 class Monad s => Strategy s where
-    siblingEvaluation :: s EvaluationMode
     -- | By being polymorphic on the response condition, we prevent
     -- this function from accidentally misdiagnosing the input.
     evaluateNode :: Info -> Bool -> condition -> s (Maybe condition)
@@ -73,15 +66,8 @@ evaluateTree info tree =
 
         Node subtrees -> do
             nodeResult    <- evaluateNode info False =<< test tree
-            mode          <- siblingEvaluation
-            childrenNodes <- evaluateLevel mode (evaluateTree info) subtrees
+            childrenNodes <- traverse (evaluateTree info) subtrees
             return $ RNode nodeResult childrenNodes
-
-evaluateLevel :: (Applicative m, Monad m) => EvaluationMode -> (input -> m output) -> [input] -> m [output]
-evaluateLevel mode f list =
-    case mode of
-      Sequential -> traverse f list
-      Parallel   -> sequence $ fmap f list
 
 -- | Check whether the result provided is correct
 isValid :: Tree Condition -> ResultTree -> Bool
@@ -99,7 +85,6 @@ runTestLeaves :: TestLeaves a -> a
 runTestLeaves (TestLeaves i) = runIdentity i
 
 instance Strategy TestLeaves where
-    siblingEvaluation = return Parallel
     evaluateNode info isLeave condition =
         if isLeave
            then return (Just condition)
@@ -116,7 +101,6 @@ runOddStrategy :: OddStrategy a -> a
 runOddStrategy (OddStrategy s) = State.evalState s 0
 
 instance Strategy OddStrategy where
-    siblingEvaluation = return Sequential
     evaluateNode info isLeave condition = do
         index <- State.get
         State.put $ index + 1
