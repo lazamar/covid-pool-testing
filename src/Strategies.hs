@@ -10,6 +10,7 @@ import Data.Monoid ((<>))
 import Data.Foldable (fold)
 import Data.Functor.Identity (Identity, runIdentity)
 import Control.Monad.State (State)
+import Data.Tree (Tree(..), drawTree)
 
 import qualified Control.Monad.State as State
 
@@ -27,16 +28,14 @@ instance Monoid Condition where
     mempty = Healthy
     mappend = (<>)
 
-data Tree a
-    = Node [Tree a]
-    | Leaf a
+-- | A tree with data only in the leaves
+data LeafTree a
+    = Leaf a
+    | LNode [LeafTree a]
     deriving (Foldable, Traversable, Functor, Show, Eq)
 
-data ResultTree
-    -- The (Maybe Condition) will be Nothing if the node or leaf was not tested
-    = RNode (Maybe Condition) [ResultTree]
-    | RLeaf (Maybe Condition)
-    deriving (Show, Eq)
+-- The (Maybe Condition) will be Nothing if the node or leaf was not tested
+type ResultTree = Tree (Maybe Condition)
 
 data Info = Info
     { arity :: Int
@@ -53,24 +52,24 @@ class Monad s => Strategy s where
     evaluateNode :: Info -> Bool -> condition -> s (Maybe condition)
     -- | Mix the samples of everyone in this tree and return a result
     -- If anyone is infected, the result will be "Infected"
-    test :: Tree Condition -> s Condition
+    test :: LeafTree Condition -> s Condition
     test tree = return $ fold tree
 
 -- | Evaluate a tree according to a strategy
-evaluateTree :: Strategy s => Info -> Tree Condition -> s ResultTree
+evaluateTree :: Strategy s => Info -> LeafTree Condition -> s ResultTree
 evaluateTree info tree =
     case tree of
         Leaf condition -> do
             result <- evaluateNode info True condition
-            return $ RLeaf result
+            return $ Node result []
 
-        Node subtrees -> do
+        LNode subtrees -> do
             nodeResult    <- evaluateNode info False =<< test tree
             childrenNodes <- traverse (evaluateTree info) subtrees
-            return $ RNode nodeResult childrenNodes
+            return $ Node nodeResult childrenNodes
 
 -- | Check whether the result provided is correct
-isValid :: Tree Condition -> ResultTree -> Bool
+isValid :: LeafTree Condition -> ResultTree -> Bool
 isValid = undefined
 
 
@@ -116,33 +115,15 @@ data GenericTree a = GNode a [GenericTree a]
     deriving (Functor)
 
 drawResult :: ResultTree -> String
-drawResult =  drawGenericTree . fmap showTest . resultToGeneric
+drawResult = drawTree . fmap showTest
     where
-        resultToGeneric :: ResultTree -> GenericTree (Maybe Condition)
-        resultToGeneric (RNode c forest) = GNode c $ fmap resultToGeneric forest
-        resultToGeneric (RLeaf c       ) = GNode c []
-
         showTest Nothing  = "Untested"
         showTest (Just c) = "Tested " <> show c
 
-
-drawTree :: Show a => Tree a -> String
-drawTree =  drawGenericTree . treeToGeneric . fmap show
+drawLeafTree :: Show a => LeafTree a -> String
+drawLeafTree  =  drawTree . toTree . fmap show
     where
-        treeToGeneric :: Tree String -> GenericTree String
-        treeToGeneric (Node forest) = GNode "" $ fmap treeToGeneric forest
-        treeToGeneric (Leaf c     ) = GNode c []
+        toTree :: LeafTree String -> Tree String
+        toTree (LNode forest) = Node "" $ fmap toTree forest
+        toTree (Leaf c      ) = Node c []
 
-drawGenericTree :: GenericTree String -> String
-drawGenericTree = unlines . draw
-    where
-        draw :: GenericTree String -> [String]
-        draw (GNode x ts0) = lines x ++ drawSubTrees ts0
-          where
-            drawSubTrees [] = []
-            drawSubTrees [t] =
-                "|" : shift "`- " "   " (draw t)
-            drawSubTrees (t:ts) =
-                "|" : shift "+- " "|  " (draw t) ++ drawSubTrees ts
-
-            shift first other = zipWith (++) (first : repeat other)
