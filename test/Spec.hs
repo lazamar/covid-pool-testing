@@ -1,6 +1,7 @@
-import Test.Hspec (Spec, describe, it, shouldBe, hspec)
+import Test.Hspec (Spec, describe, it, shouldBe, hspec, xdescribe, xit)
 import Test.QuickCheck (suchThat, property, vectorOf, Arbitrary, arbitrary, arbitraryBoundedEnum, NonEmptyList(..))
 import Strategies
+import Data.Tree (Tree(..))
 
 maxSampleSize = 10
 
@@ -46,3 +47,39 @@ main = hspec $ do
                 scenario <- vectorOf n arbitrary
                 -- Make sure it appears in generateScenarios
                 return $ scenario `elem` generateScenarios (length scenario)
+    describe "Result Tree" $ do
+        it "is valid when everyone is tested" $
+            let
+                tree = Node (Just Infected)
+                    [ Node (Just Healthy) []
+                    , Node (Just Infected) []
+                    ]
+            in
+            isValid tree `shouldBe` True
+
+        it "is valid when children of a healthy parent are not tested" $
+            let
+                tree = Node (Just Healthy)
+                    [ Node Nothing []
+                    , Node Nothing []
+                    ]
+            in
+            isValid tree `shouldBe` True
+
+        it "is valid when only leaves are tested" $
+            let
+                tree = Node Nothing
+                    [ Node (Just Healthy) []
+                    , Node (Just Infected) []
+                    ]
+            in
+            isValid tree `shouldBe` True
+
+        it "is invalid when children of infected nodes are not tested" $
+            let
+                tree = Node (Just Infected)
+                    [ Node Nothing []
+                    , Node (Just Infected) []
+                    ]
+            in
+            isValid tree `shouldBe` False
