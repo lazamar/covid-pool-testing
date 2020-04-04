@@ -24,8 +24,18 @@ showStats :: (Arity, InfectionRate, PoolSize, Map.Map Int Likelihood) -> String
 showStats (arity, rate, pool, d) =
     unlines
     [ unwords [show arity, ",", show rate, ",", show pool]
-    , unlines $ ("       | " <>) <$> unwords . biList . (show *** show) <$> Map.toList d
+    , unlines $ tabbed <$> unwords . biList . (take 5 . (<> "   ") . show *** show) <$> Map.toList d
+    , tabbed $ "Chances of using less than " <> show size <> " tests: " <>
+        ( show
+        $ sum
+        $ fmap snd
+        $ filter ((< 7) . fst)
+        $ Map.toList d
+        )
     ]
+    where
+        tabbed = ("       | " <>)
+        PoolSize size = pool
 
 
 
