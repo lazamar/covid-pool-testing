@@ -6,9 +6,10 @@
 module Strategies where
 
 import Control.Monad.State (State)
-import Data.Foldable (fold)
+import Data.Foldable (fold, asum)
 import Data.Functor.Identity (Identity, runIdentity)
 import Data.List (permutations)
+import Data.Maybe (isJust)
 import Data.Tree (Tree(..))
 
 import qualified Control.Monad.State as State
@@ -86,8 +87,22 @@ evaluateTree info tree =
             Node nodeResult <$> traverse (evaluateTree info) subtrees
 
 -- | Check whether the result provided is correct
-isValid :: LeafTree Condition -> ResultTree -> Bool
-isValid = undefined
+--
+-- The result is correct if a leaf was tested or if a leaf was
+-- not tested because one of its parents tested as healthy.
+isValid :: ResultTree -> Bool
+isValid result = go [] result
+    where
+        go parents (Node subject [])     = wasTested subject || (Just Healthy == lastDiagnosed parents)
+        go parents (Node mtest children) = and $ go (mtest:parents) <$> children
+
+        lastDiagnosed :: [Maybe Condition] -> Maybe Condition
+        lastDiagnosed = asum
+
+        wasTested :: Maybe Condition -> Bool
+        wasTested = isJust
+
+
 
 
 -- | Do nothing
