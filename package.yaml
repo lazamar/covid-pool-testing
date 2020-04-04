@@ -50,3 +50,5 @@ tests:
     - -with-rtsopts=-N
     dependencies:
     - marcelo
+    - hspec
+    - QuickCheck

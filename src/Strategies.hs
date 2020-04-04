@@ -20,7 +20,7 @@ import qualified Data.Set as Set
 data Condition
     = Infected
     | Healthy
-    deriving (Show, Eq, Ord)
+    deriving (Show, Eq, Ord, Bounded, Enum)
 
 -- | How to mix conditions together.
 instance Semigroup Condition where
