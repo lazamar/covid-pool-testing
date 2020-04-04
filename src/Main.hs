@@ -4,4 +4,4 @@ import Strategies
 import WorkIt
 
 main :: IO ()
-main = putStrLn "WIP"
+main = putStrLn $ unlines $ showStats <$> tryIt

@@ -9,6 +9,7 @@ module Strategies where
 import Control.Monad.State (State)
 import Control.Arrow ((&&&))
 import Data.Bifunctor (first)
+import Data.Fixed (Centi, showFixed)
 import Data.Foldable (fold, asum)
 import Data.Functor.Identity (Identity, runIdentity)
 import Data.List (permutations)
@@ -126,7 +127,11 @@ newtype InfectionRate = InfectionRate  Double
     deriving (Show, Eq)
 
 newtype Likelihood = Likelihood Double
-    deriving (Show, Eq, Num)
+    deriving (Eq, Num)
+
+-- Show as percentage cropped to two decimal points
+instance Show Likelihood where
+    show (Likelihood n) = showFixed True (fromRational $ toRational $ 100 * n :: Centi) <> "%"
 
 -- | A Scenario is a certain amount of healthy and infected
 -- subjects in a particular order
