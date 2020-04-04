@@ -14,11 +14,8 @@ instance Arbitrary Condition where
 instance Arbitrary InfectionRate where
     arbitrary = InfectionRate <$> suchThat arbitrary (\n -> n > 0 && n < 1)
 
-newtype SampleSize = SampleSize Int
-    deriving (Show, Eq)
-
-instance Arbitrary SampleSize where
-    arbitrary = SampleSize <$> suchThat arbitrary (\n -> n > 0 && n < maxSampleSize)
+instance Arbitrary PoolSize where
+    arbitrary = PoolSize <$> suchThat arbitrary (\n -> n > 0 && n < maxSampleSize)
 
 fromLikelihood :: Likelihood -> Double
 fromLikelihood (Likelihood v) = v
@@ -32,13 +29,13 @@ main :: IO ()
 main = hspec $ do
     describe "Tree generation" $ do
          it "likelihoods add up to 100%" $ do
-             property $ \rate (SampleSize sampleSize) arity ->
+             property $ \rate size ->
                  -- We have some tolerance to account for
                  -- the innaccuracy of floating number arithmetic.
                  isEqualWithTolerance 0.01 1
                      $ sum
-                     $ fmap (fromLikelihood . fst)
-                     $ generateTrees rate sampleSize arity
+                     $ fmap (fromLikelihood . getLikelihood rate)
+                     $ generateScenarios size
 
          it "doesn't miss any scenario" $ do
             property $ do
@@ -46,7 +43,7 @@ main = hspec $ do
                 -- create a random scenario
                 scenario <- vectorOf n arbitrary
                 -- Make sure it appears in generateScenarios
-                return $ scenario `elem` generateScenarios (length scenario)
+                return $ scenario `elem` generateScenarios (PoolSize n)
     describe "Result Tree" $ do
         it "is valid when everyone is tested" $
             let

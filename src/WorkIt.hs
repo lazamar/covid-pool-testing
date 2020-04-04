@@ -3,7 +3,7 @@
 -- Functions to help me test this thing
 module WorkIt where
 
-import Strategies (Condition(..), LeafTree(..), ResultTree, toLeafTree, Arity(..))
+import Strategies (Condition(..), LeafTree(..), ResultTree, toStructure, Arity(..))
 import Data.Tree (Tree(..), drawTree)
 
 conditions :: [Condition]
@@ -11,7 +11,7 @@ conditions = cycle [Infected, Healthy]
 
 
 createTree :: Int -> Int -> LeafTree Condition
-createTree arity leafCount = toLeafTree (Arity arity) $ take leafCount conditions
+createTree arity leafCount = toStructure (Arity arity) $ take leafCount conditions
 
 drawResult :: ResultTree -> String
 drawResult = drawTree . fmap showTest

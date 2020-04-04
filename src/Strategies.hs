@@ -2,18 +2,23 @@
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE RankNTypes #-}
 
 module Strategies where
 
 import Control.Monad.State (State)
+import Control.Arrow ((&&&))
+import Data.Bifunctor (first)
 import Data.Foldable (fold, asum)
 import Data.Functor.Identity (Identity, runIdentity)
 import Data.List (permutations)
+import Data.Map (Map)
 import Data.Maybe (isJust)
-import Data.Tree (Tree(..))
+import Data.Tree (Tree(..), foldTree)
 
 import qualified Control.Monad.State as State
 import qualified Data.Set as Set
+import qualified Data.Map as Map
 
 data Condition
     = Infected
@@ -43,7 +48,8 @@ type ResultTree = Tree (Maybe Condition)
 
 data Info = Info
     { info_arity :: Arity
-    , info_poolSize :: Int
+    , info_poolSize :: PoolSize
+    , info_infectionRate :: InfectionRate
     }
     deriving (Show, Eq)
 
@@ -51,6 +57,7 @@ class Monad s => Strategy s where
     -- | By being polymorphic on the response condition, we prevent
     -- this function from accidentally misdiagnosing the input.
     evaluateNode :: Info -> Bool -> s (TestCmd s)
+    strategyName :: s String
 
 data TestCmd m
     -- | This callback allows us to process the output of the test
@@ -102,40 +109,35 @@ isValid result = go [] result
         wasTested :: Maybe Condition -> Bool
         wasTested = isJust
 
-
-
-
 -- | Do nothing
 noop :: Monad m => a -> m ()
 noop _ = return ()
 
 -------------------------------------------------------------------------------
--- Assessing strategy efficiency
+-- Generating Scenarios
 
 newtype Arity = Arity Int
     deriving (Show, Eq)
 
+newtype PoolSize = PoolSize Int
+    deriving (Show, Eq)
 -- | Likelihood of someone being infected as a number between 0 and 1
 newtype InfectionRate = InfectionRate  Double
     deriving (Show, Eq)
 
 newtype Likelihood = Likelihood Double
-    deriving (Show, Eq)
+    deriving (Show, Eq, Num)
 
 -- | A Scenario is a certain amount of healthy and infected
 -- subjects in a particular order
 type Scenario = [Condition]
 
-generateTrees :: InfectionRate -> Int -> Arity -> [(Likelihood, LeafTree Condition)]
-generateTrees rate sampleSize arity =
-    fmap
-        (\s -> (getLikelihood rate s, toLeafTree arity s))
-        (generateScenarios sampleSize)
+type Structure = LeafTree Condition
 
-generateScenarios :: Int -> [Scenario]
-generateScenarios sampleSize = do
-    infectedCount <- [0..sampleSize]
-    let healthyCount = sampleSize - infectedCount
+generateScenarios :: PoolSize -> [Scenario]
+generateScenarios (PoolSize size) = do
+    infectedCount <- [0..size]
+    let healthyCount = size - infectedCount
         infected     = take infectedCount $ repeat Infected
         healthy      = take healthyCount  $ repeat Healthy
     noRepeats $ permutations (infected ++ healthy)
@@ -153,8 +155,9 @@ getLikelihood (InfectionRate infectedRate) scenario =
         toRate Healthy  = healthyRate
         toRate Infected = infectedRate
 
-toLeafTree :: Arity -> [a] -> LeafTree a
-toLeafTree (Arity arity) list = chunkIt $ fmap Leaf list
+-- | Organise a scenario in a Tree of a specified arity
+toStructure :: Arity -> Scenario -> Structure
+toStructure (Arity arity) list = chunkIt $ fmap Leaf list
     where
         chunkIt (root:[]) = root
         chunkIt nodes = chunkIt $ fmap toNode $ chunksOf arity nodes
@@ -166,6 +169,54 @@ toLeafTree (Arity arity) list = chunkIt $ fmap Leaf list
         chunksOf _ [] = []
         chunksOf size l = take size l : chunksOf size (drop size l)
 
+-------------------------------------------------------------------------------
+-- Assessing strategy efficiency
+
+testsUsed :: ResultTree -> Int
+testsUsed = foldTree $ \node children -> toNumber node + sum children
+    where
+        toNumber Nothing = 0
+        toNumber _       = 1
+
+-- | Returns a map of the probability of using a certain amount of tests
+-- Adds likelihoods of using the same amount of tests
+probabilities :: Strategy s
+    => (forall a. s a -> a) -- ^ run strategy
+    -> Info
+    -> [(LeafTree Condition, Likelihood)]
+    -> Map Int Likelihood
+probabilities run info scenarioTrees = Map.fromListWith (+) $ first eval <$> scenarioTrees
+    where
+        eval tree =
+            let result = run (evaluateTree info tree)
+            in
+            if isValid result
+               then testsUsed result
+               else error $ unwords
+                    [ "The strategy"
+                    , run strategyName
+                    , "returned an invalid result when using configuration:"
+                    , show info
+                    ]
+
+assess :: Strategy s
+    => [Arity]
+    -> [InfectionRate]
+    -> [PoolSize]
+    -> (forall a. s a -> a) -- ^ run the strategy
+    -> [(Arity, InfectionRate, PoolSize, Map Int Likelihood)]
+assess arities rates sizes run = do
+    size  <- sizes
+    let scenarios = generateScenarios size
+    arity <- arities
+    rate  <- rates
+    let info = Info arity size rate
+    return $
+        ( arity
+        , rate
+        , size
+        , probabilities run info $ (toStructure arity &&& getLikelihood rate) <$> scenarios
+        )
 
 -------------------------------------------------------------------------------
 -- Strategies
