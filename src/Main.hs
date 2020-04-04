@@ -10,6 +10,7 @@ main = putStrLn
     $ unlines
     [ tryIt runTestLeaves
     , tryIt runTestAllNodes
+    , tryIt runTestIPChildren
     ]
     where
         tryIt :: Strategy s => (forall a. s a -> a) -> String

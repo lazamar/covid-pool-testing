@@ -14,8 +14,8 @@ import Data.Foldable (fold, asum)
 import Data.Functor.Identity (Identity, runIdentity)
 import Data.List (permutations,foldl')
 import Data.Map (Map)
-import Data.Maybe (isJust)
-import Data.Tree (Tree(..), foldTree)
+import Data.Maybe (isJust, fromMaybe, mapMaybe)
+import Data.Tree (Tree(..), foldTree, drawTree)
 
 import qualified Control.Monad.State as State
 import qualified Data.Set as Set
@@ -197,12 +197,31 @@ probabilities run info scenarioTrees = Map.fromListWith (+) $ first eval <$> sce
             in
             if isValid result
                then testsUsed result
-               else error $ unwords
+               else error $ unlines
+                [ unwords
                     [ "The strategy"
                     , run strategyName
                     , "returned an invalid result when using configuration:"
                     , show info
                     ]
+                , "Input tree:"
+                , drawLeafTree tree
+                , "Result tree:"
+                , drawResult result
+                ]
+
+drawResult :: ResultTree -> String
+drawResult = drawTree . fmap showTest
+    where
+        showTest Nothing  = "Untested"
+        showTest (Just c) = "Tested " <> show c
+
+drawLeafTree :: Show a => LeafTree a -> String
+drawLeafTree  =  drawTree . toTree . fmap show
+    where
+        toTree :: LeafTree String -> Tree String
+        toTree (LNode forest) = Node "" $ fmap toTree forest
+        toTree (Leaf c      ) = Node c []
 
 assess :: Strategy s
     => [Arity]
@@ -270,21 +289,44 @@ instance Strategy TestAllNodes  where
     evaluateNode _ _ = return $ RunTest noop
 
 -- Only test children of infected parents
-newtype TestIPChildren a = TestIPChildren (State Int a)
-    deriving newtype (Applicative, Functor, Monad, State.MonadState Int)
+newtype TestIPChildren a = TestIPChildren (State IPInfo a)
+    deriving newtype (Applicative, Functor, Monad, State.MonadState IPInfo)
+
+type IPInfo = Map Int Condition
 
 runTestIPChildren :: TestIPChildren a -> a
-runTestIPChildren  (TestIPChildren s) = State.evalState s 0
+runTestIPChildren  (TestIPChildren s) = State.evalState s mempty
 
 instance Strategy TestIPChildren  where
-    strategyName = return "Test children of infected parents"
-    evaluateNode _ _ = do
-        index <- State.get
-        State.put $ index + 1
-        return SkipTest
+    strategyName = return "Eagerly test children of infected parents"
+    evaluateNode (Info arity size rate) _ = do
+        nodes <- State.get
+        let index = case Map.keys nodes of
+                []   -> 0
+                keys -> 1 + maximum keys
 
+            indices = indexTree arity size
+            parents = (`Map.lookup` nodes) <$> parentIndices index indices
+            lastTestedParent = asum parents
+
+        return $ if lastTestedParent == Just Healthy
+            then SkipTest
+            else RunTest $ \condition -> State.put $ Map.insert index condition nodes
+
+-- | Returns index of parents of a node with a certain index.
+-- ordered from closest parent to root
+parentIndices :: Int -> IndicesTree -> [Int]
+parentIndices target (IndicesTree tree) = fromMaybe [] $ go [] tree
+    where
+        go parents node@(Node index children) =
+            if index == target
+                then Just parents
+                else asum $ go (index:parents) <$> children
+
+-- | A tree holding the index of each node when traversed
+-- depth-first
 newtype IndicesTree = IndicesTree (Tree Int)
--- | Create a tree of indices in a depth first search
+
 indexTree :: Arity -> PoolSize -> IndicesTree
 indexTree arity (PoolSize size)
     = IndicesTree
