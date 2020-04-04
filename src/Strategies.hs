@@ -8,11 +8,11 @@ module Strategies where
 
 import Control.Monad.State (State)
 import Control.Arrow ((&&&))
-import Data.Bifunctor (first)
+import Data.Bifunctor (first, second)
 import Data.Fixed (Centi, showFixed)
 import Data.Foldable (fold, asum)
 import Data.Functor.Identity (Identity, runIdentity)
-import Data.List (permutations)
+import Data.List (permutations,foldl')
 import Data.Map (Map)
 import Data.Maybe (isJust)
 import Data.Tree (Tree(..), foldTree)
@@ -268,4 +268,45 @@ runTestAllNodes  (TestAllNodes i) = runIdentity i
 instance Strategy TestAllNodes  where
     strategyName = return "Test all nodes"
     evaluateNode _ _ = return $ RunTest noop
+
+-- Only test children of infected parents
+newtype TestIPChildren a = TestIPChildren (State Int a)
+    deriving newtype (Applicative, Functor, Monad, State.MonadState Int)
+
+runTestIPChildren :: TestIPChildren a -> a
+runTestIPChildren  (TestIPChildren s) = State.evalState s 0
+
+instance Strategy TestIPChildren  where
+    strategyName = return "Test children of infected parents"
+    evaluateNode _ _ = do
+        index <- State.get
+        State.put $ index + 1
+        return SkipTest
+
+newtype IndicesTree = IndicesTree (Tree Int)
+-- | Create a tree of indices in a depth first search
+indexTree :: Arity -> PoolSize -> IndicesTree
+indexTree arity (PoolSize size)
+    = IndicesTree
+    $ snd
+    $ asIndices 0
+    $ toStructure arity
+    $ take size
+    $ repeat Healthy
+    where
+        asIndices :: Int -> LeafTree a -> (Int, Tree Int)
+        asIndices index tree =
+            case tree of
+                Leaf _ ->  (index, Node index [])
+                LNode children ->
+                    let
+                        mkChild (ix, cs) child =
+                            let (newIx, newChild) = asIndices (ix + 1) child
+                            in
+                            (newIx, newChild:cs)
+
+                        (maxIndex, newChildren) = second reverse $ foldl' mkChild (index, []) children
+                    in
+                    (maxIndex, Node index newChildren)
+
 
