@@ -1,5 +1,5 @@
 import Test.Hspec (Spec, describe, it, shouldBe, hspec)
-import Test.QuickCheck (suchThat, property, Arbitrary, arbitrary, arbitraryBoundedEnum)
+import Test.QuickCheck (suchThat, property, vectorOf, Arbitrary, arbitrary, arbitraryBoundedEnum, NonEmptyList(..))
 import Strategies
 
 maxSampleSize = 10
@@ -30,12 +30,19 @@ isEqualWithTolerance tolerance reference result =
 main :: IO ()
 main = hspec $ do
     describe "Tree generation" $ do
-        it "likelihoods add up to 100%" $ do
-            property $ \rate (SampleSize sampleSize) arity ->
-                -- We have some tolerance to account for
-                -- the innaccuracy of floating number arithmetic.
-                isEqualWithTolerance 0.01 1
-                    $ sum
-                    $ fmap (fromLikelihood . fst)
-                    $ generateTrees rate sampleSize arity
+         it "likelihoods add up to 100%" $ do
+             property $ \rate (SampleSize sampleSize) arity ->
+                 -- We have some tolerance to account for
+                 -- the innaccuracy of floating number arithmetic.
+                 isEqualWithTolerance 0.01 1
+                     $ sum
+                     $ fmap (fromLikelihood . fst)
+                     $ generateTrees rate sampleSize arity
 
+         it "doesn't miss any scenario" $ do
+            property $ do
+                n <- suchThat arbitrary (\n -> n > 0 && n < maxSampleSize)
+                -- create a random scenario
+                scenario <- vectorOf n arbitrary
+                -- Make sure it appears in generateScenarios
+                return $ scenario `elem` generateScenarios (length scenario)
