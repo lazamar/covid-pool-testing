@@ -16,6 +16,7 @@ import Data.List (permutations,foldl')
 import Data.Map (Map)
 import Data.Maybe (isJust, fromMaybe, mapMaybe)
 import Data.Tree (Tree(..), foldTree, drawTree)
+import Debug.Trace
 
 import qualified Control.Monad.State as State
 import qualified Data.Set as Set
@@ -292,7 +293,7 @@ instance Strategy TestAllNodes  where
 newtype TestIPChildren a = TestIPChildren (State IPInfo a)
     deriving newtype (Applicative, Functor, Monad, State.MonadState IPInfo)
 
-type IPInfo = Map Int Condition
+type IPInfo = Map Int (Maybe Condition)
 
 runTestIPChildren :: TestIPChildren a -> a
 runTestIPChildren  (TestIPChildren s) = State.evalState s mempty
@@ -306,12 +307,15 @@ instance Strategy TestIPChildren  where
                 keys -> 1 + maximum keys
 
             indices = indexTree arity size
-            parents = (`Map.lookup` nodes) <$> parentIndices index indices
+            parents = mapMaybe (`Map.lookup` nodes) $ parentIndices index indices
             lastTestedParent = asum parents
 
-        return $ if lastTestedParent == Just Healthy
-            then SkipTest
-            else RunTest $ \condition -> State.put $ Map.insert index condition nodes
+        if lastTestedParent == Just Healthy
+            then do
+                State.put $ Map.insert index Nothing nodes
+                return SkipTest
+            else return $ RunTest $ \condition ->
+                State.put $ Map.insert index (Just condition) nodes
 
 -- | Returns index of parents of a node with a certain index.
 -- ordered from closest parent to root
