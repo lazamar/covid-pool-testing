@@ -235,6 +235,7 @@ runTestLeaves :: TestLeaves a -> a
 runTestLeaves (TestLeaves i) = runIdentity i
 
 instance Strategy TestLeaves where
+    strategyName = return "Test leaves"
     evaluateNode _ isLeaf =
         return $ if isLeaf
            then RunTest noop
@@ -248,6 +249,7 @@ runOddStrategy :: OddStrategy a -> a
 runOddStrategy (OddStrategy s) = State.evalState s 0
 
 instance Strategy OddStrategy where
+    strategyName = return "Test odd-indexed nodes"
     evaluateNode _ _ = do
         index <- State.get
         State.put $ index + 1

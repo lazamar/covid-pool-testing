@@ -4,7 +4,7 @@
 module WorkIt where
 
 import Strategies (Condition(..), LeafTree(..), ResultTree, toStructure, Arity(..), assess
-                  , InfectionRate(..), PoolSize(..), TestLeaves, runTestLeaves)
+                  , InfectionRate(..), PoolSize(..), TestLeaves, Likelihood)
 import Control.Arrow ((***))
 import Data.Bifoldable (biList)
 import Data.List (intersperse)
@@ -32,14 +32,7 @@ drawLeafTree  =  drawTree . toTree . fmap show
         toTree (LNode forest) = Node "" $ fmap toTree forest
         toTree (Leaf c      ) = Node c []
 
-tryIt =
-    let
-        arities = Arity <$> [3..5]
-        rates   = InfectionRate <$> [0.1]
-        pools   = PoolSize <$> [7]
-    in
-    assess arities rates pools runTestLeaves
-
+showStats :: (Arity, InfectionRate, PoolSize, Map.Map Int Likelihood) -> String
 showStats (arity, rate, pool, d) =
     unlines
     [ unwords [show arity, ",", show rate, ",", show pool]
