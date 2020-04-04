@@ -5,13 +5,10 @@
 
 module Strategies where
 
-import Data.Bifunctor (first, second)
-import Data.List (mapAccumL, permutations)
-import Data.Monoid ((<>))
+import Control.Monad.State (State)
 import Data.Foldable (fold)
 import Data.Functor.Identity (Identity, runIdentity)
-import Control.Monad (void)
-import Control.Monad.State (State)
+import Data.List (permutations)
 import Data.Tree (Tree(..))
 
 import qualified Control.Monad.State as State
@@ -37,12 +34,15 @@ data LeafTree a
     | LNode [LeafTree a]
     deriving (Foldable, Traversable, Functor, Show, Eq)
 
+-------------------------------------------------------------------------------
+-- Applying strategies
+
 -- The (Maybe Condition) will be Nothing if the node or leaf was not tested
 type ResultTree = Tree (Maybe Condition)
 
 data Info = Info
-    { arity :: Int
-    , poolSize :: Int
+    { info_arity :: Arity
+    , info_poolSize :: Int
     }
     deriving (Show, Eq)
 
@@ -76,7 +76,7 @@ test = fold
 evaluateTree :: Strategy s => Info -> LeafTree Condition -> s ResultTree
 evaluateTree info tree =
     case tree of
-        Leaf condition -> do
+        Leaf _ -> do
             result <- runTestCmd tree =<< evaluateNode info True
             return $ Node result []
 
@@ -164,8 +164,8 @@ runTestLeaves :: TestLeaves a -> a
 runTestLeaves (TestLeaves i) = runIdentity i
 
 instance Strategy TestLeaves where
-    evaluateNode info isLeave =
-        return $ if isLeave
+    evaluateNode _ isLeaf =
+        return $ if isLeaf
            then RunTest noop
            else SkipTest
 
@@ -177,7 +177,7 @@ runOddStrategy :: OddStrategy a -> a
 runOddStrategy (OddStrategy s) = State.evalState s 0
 
 instance Strategy OddStrategy where
-    evaluateNode info isLeave = do
+    evaluateNode _ _ = do
         index <- State.get
         State.put $ index + 1
         return $ if odd index
