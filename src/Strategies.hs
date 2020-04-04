@@ -1,11 +1,12 @@
 {-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE TupleSections #-}
 
 module Strategies where
 
 import Data.Bifunctor (first, second)
-import Data.List (mapAccumL)
+import Data.List (mapAccumL, permutations)
 import Data.Monoid ((<>))
 import Data.Foldable (fold)
 import Data.Functor.Identity (Identity, runIdentity)
@@ -14,11 +15,12 @@ import Control.Monad.State (State)
 import Data.Tree (Tree(..))
 
 import qualified Control.Monad.State as State
+import qualified Data.Set as Set
 
 data Condition
     = Infected
     | Healthy
-    deriving (Show, Eq)
+    deriving (Show, Eq, Ord)
 
 -- | How to mix conditions together.
 instance Semigroup Condition where
@@ -91,6 +93,64 @@ isValid = undefined
 -- | Do nothing
 noop :: Monad m => a -> m ()
 noop _ = return ()
+
+-------------------------------------------------------------------------------
+-- Assessing strategy efficiency
+
+newtype Arity = Arity Int
+    deriving (Show, Eq)
+
+-- | Likelihood of someone being infected as a number between 0 and 1
+newtype InfectionRate = InfectionRate  Double
+    deriving (Show, Eq)
+
+newtype Likelihood = Likelihood Double
+    deriving (Show, Eq)
+
+-- | A Scenario is a certain amount of healthy and infected
+-- subjects in a particular order
+type Scenario = [Condition]
+
+generateTrees :: InfectionRate -> Int -> Arity -> [(Likelihood, LeafTree Condition)]
+generateTrees rate sampleSize arity =
+    fmap
+        (\s -> (getLikelihood rate s, toLeafTree arity s))
+        (generateScenarios sampleSize)
+
+generateScenarios :: Int -> [Scenario]
+generateScenarios sampleSize = do
+    infectedCount <- [0..sampleSize]
+    let healthyCount = sampleSize - infectedCount
+        infected     = take infectedCount $ repeat Infected
+        healthy      = take healthyCount  $ repeat Healthy
+    noRepeats $ permutations (infected ++ healthy)
+
+-- | O(nlogn)
+noRepeats :: Ord a => [a] -> [a]
+noRepeats = Set.toList . Set.fromList
+
+getLikelihood :: InfectionRate -> Scenario -> Likelihood
+getLikelihood (InfectionRate infectedRate) scenario =
+    Likelihood $ foldr (*) 1 $ fmap toRate scenario
+    where
+        healthyRate = 1 - infectedRate
+
+        toRate Healthy  = healthyRate
+        toRate Infected = infectedRate
+
+toLeafTree :: Arity -> [a] -> LeafTree a
+toLeafTree (Arity arity) list = chunkIt $ fmap Leaf list
+    where
+        chunkIt (root:[]) = root
+        chunkIt nodes = chunkIt $ fmap toNode $ chunksOf arity nodes
+
+        toNode (root:[]) = root
+        toNode nodes = LNode nodes
+
+        chunksOf :: Int -> [a] -> [[a]]
+        chunksOf _ [] = []
+        chunksOf size l = take size l : chunksOf size (drop size l)
+
 
 -------------------------------------------------------------------------------
 -- Strategies
