@@ -9,13 +9,13 @@ main :: IO ()
 main = putStrLn
     $ unlines
     [ tryIt runTestLeaves
-    , tryIt runOddStrategy
+    , tryIt runTestAllNodes
     ]
     where
         tryIt :: Strategy s => (forall a. s a -> a) -> String
         tryIt run =
             let
-                arities = Arity <$> [3..5]
+                arities = Arity <$> [2..7]
                 rates   = InfectionRate <$> [0.1]
                 pools   = PoolSize <$> [7]
             in

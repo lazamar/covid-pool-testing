@@ -257,3 +257,15 @@ instance Strategy OddStrategy where
            then RunTest noop
            else SkipTest
 
+-- A strategy to test all nodes (very wasteful)
+newtype TestAllNodes a = TestAllNodes (Identity a)
+    deriving (Eq, Show)
+    deriving newtype (Applicative, Monad, Functor)
+
+runTestAllNodes :: TestAllNodes a -> a
+runTestAllNodes  (TestAllNodes i) = runIdentity i
+
+instance Strategy TestAllNodes  where
+    strategyName = return "Test all nodes"
+    evaluateNode _ _ = return $ RunTest noop
+
