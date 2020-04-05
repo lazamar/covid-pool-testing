@@ -5,8 +5,8 @@ import Data.Tree (Tree(..))
 
 maxSampleSize = 10
 
-instance Arbitrary Arity where
-    arbitrary = Arity <$> suchThat arbitrary (\n -> n > 0 && n < maxSampleSize)
+instance Arbitrary Degree where
+    arbitrary = Degree <$> suchThat arbitrary (\n -> n > 0 && n < maxSampleSize)
 
 instance Arbitrary Condition where
     arbitrary = arbitraryBoundedEnum
@@ -36,6 +36,15 @@ main = hspec $ do
                      $ sum
                      $ fmap (fromLikelihood . getLikelihood rate)
                      $ generateScenarios size
+
+         it "combinatoric likelihoods add up to 100%" $ do
+             property $ \rate size ->
+                 -- We have some tolerance to account for
+                 -- the innaccuracy of floating number arithmetic.
+                 isEqualWithTolerance 0.01 1
+                     $ sum
+                     $ fmap (fromLikelihood . combinatoricsLikelihood rate)
+                     $ combinatoricsScenarios size
 
          it "doesn't miss any scenario" $ do
             property $ do

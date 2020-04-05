@@ -49,7 +49,7 @@ data LeafTree a
 type ResultTree = Tree (Maybe Condition)
 
 data Info = Info
-    { info_arity :: Arity
+    { info_arity :: Degree
     , info_poolSize :: PoolSize
     , info_infectionRate :: InfectionRate
     }
@@ -118,21 +118,27 @@ noop _ = return ()
 -------------------------------------------------------------------------------
 -- Generating Scenarios
 
-newtype Arity = Arity Int
+newtype Degree = Degree Int
     deriving (Show, Eq)
 
 newtype PoolSize = PoolSize Int
     deriving (Show, Eq)
+
 -- | Likelihood of someone being infected as a number between 0 and 1
 newtype InfectionRate = InfectionRate  Double
-    deriving (Show, Eq)
+    deriving (Eq)
+
+instance Show InfectionRate where
+    show (InfectionRate n) = "InfectionRate " <> showAsPercentage n
 
 newtype Likelihood = Likelihood Double
-    deriving (Eq, Num)
+    deriving (Eq, Num, Fractional)
 
--- Show as percentage cropped to two decimal points
 instance Show Likelihood where
-    show (Likelihood n) = showFixed True (fromRational $ toRational $ 100 * n :: Centi) <> "%"
+    show (Likelihood n) = "Likelihood " <> showAsPercentage n
+
+showAsPercentage :: Double -> String
+showAsPercentage n = showFixed True (fromRational $ toRational $ 100 * n :: Centi) <> "%"
 
 -- | A Scenario is a certain amount of healthy and infected
 -- subjects in a particular order
@@ -140,17 +146,38 @@ type Scenario = [Condition]
 
 type Structure = LeafTree Condition
 
-generateScenarios :: PoolSize -> [Scenario]
-generateScenarios (PoolSize size) = do
+-- | Scenarios where one person is infected, two people are infected, etc
+-- All permutations of a scenario are counted as one
+combinatoricsScenarios :: PoolSize -> [Scenario]
+combinatoricsScenarios (PoolSize size) = do
     infectedCount <- [0..size]
     let healthyCount = size - infectedCount
         infected     = take infectedCount $ repeat Infected
         healthy      = take healthyCount  $ repeat Healthy
-    noRepeats $ permutations (infected ++ healthy)
+    return (infected ++ healthy)
+
+-- | O(n!) This is by far the slowest part of the program
+-- All possible permutations
+generateScenarios :: PoolSize -> [Scenario]
+generateScenarios size =
+    concat $ noRepeats . permutations <$> combinatoricsScenarios size
 
 -- | O(nlogn)
 noRepeats :: Ord a => [a] -> [a]
 noRepeats = Set.toList . Set.fromList
+
+-- | Likelihood of this scneario and all of its possible permutations
+combinatoricsLikelihood :: InfectionRate -> Scenario -> Likelihood
+combinatoricsLikelihood rate scenario =
+    getLikelihood rate scenario * Likelihood possiblePermutations
+    where
+        infectedCount = length $ filter (== Infected) scenario
+        possiblePermutations =
+            factorial (length scenario) /
+                (factorial infectedCount * factorial (length scenario - infectedCount))
+
+factorial n = allFactorials !! n
+allFactorials = 1 : zipWith (*) [1..] allFactorials
 
 getLikelihood :: InfectionRate -> Scenario -> Likelihood
 getLikelihood (InfectionRate infectedRate) scenario =
@@ -162,8 +189,8 @@ getLikelihood (InfectionRate infectedRate) scenario =
         toRate Infected = infectedRate
 
 -- | Organise a scenario in a Tree of a specified arity
-toStructure :: Arity -> Scenario -> Structure
-toStructure (Arity arity) list = chunkIt $ fmap Leaf list
+toStructure :: Degree -> Scenario -> Structure
+toStructure (Degree arity) list = chunkIt $ fmap Leaf list
     where
         chunkIt (root:[]) = root
         chunkIt nodes = chunkIt $ fmap toNode $ chunksOf arity nodes
@@ -225,11 +252,11 @@ drawLeafTree  =  drawTree . toTree . fmap show
         toTree (Leaf c      ) = Node c []
 
 assess :: Strategy s
-    => [Arity]
+    => [Degree]
     -> [InfectionRate]
     -> [PoolSize]
     -> (forall a. s a -> a) -- ^ run the strategy
-    -> [(Arity, InfectionRate, PoolSize, Map Int Likelihood)]
+    -> [(Degree, InfectionRate, PoolSize, Map Int Likelihood)]
 assess arities rates sizes run = do
     size  <- sizes
     let scenarios = generateScenarios size
@@ -242,6 +269,21 @@ assess arities rates sizes run = do
         , size
         , probabilities run info $ (toStructure arity &&& getLikelihood rate) <$> scenarios
         )
+
+-- | An assessment routine where the tree Degree is always equal to the PoolSize
+--
+-- Performance-wise this is much much faster.
+-- assessOneLevel :: Strategy s
+--     -> [PoolSize]
+--     -> [InfectionRate]
+--     -> (forall a. s a -> a) -- ^ run the strategy
+--     -> [(Degree, InfectionRate, PoolSize, Map Int Likelihood)]
+-- assessOneLevel sizes rates run = do
+--     size <- sizes
+--     let scenarios = combinatoricsScenarios size
+--     return []
+
+
 
 -------------------------------------------------------------------------------
 -- Strategies
@@ -331,7 +373,7 @@ parentIndices target (IndicesTree tree) = fromMaybe [] $ go [] tree
 -- depth-first
 newtype IndicesTree = IndicesTree (Tree Int)
 
-indexTree :: Arity -> PoolSize -> IndicesTree
+indexTree :: Degree -> PoolSize -> IndicesTree
 indexTree arity (PoolSize size)
     = IndicesTree
     $ snd

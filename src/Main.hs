@@ -16,7 +16,7 @@ main = putStrLn
         tryIt :: Strategy s => (forall a. s a -> a) -> String
         tryIt run =
             let
-                arities = Arity <$> [2..7]
+                arities = Degree <$> [2..7]
                 rates   = InfectionRate <$> [0.1]
                 pools   = PoolSize <$> [7]
             in

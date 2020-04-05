@@ -3,7 +3,7 @@
 -- Functions to help me test this thing
 module WorkIt where
 
-import Strategies (Condition(..), LeafTree(..), ResultTree, toStructure, Arity(..), assess
+import Strategies (Condition(..), LeafTree(..), ResultTree, toStructure, Degree(..), assess
                   , InfectionRate(..), PoolSize(..), TestLeaves, Likelihood)
 import Control.Arrow ((***))
 import Data.Bifoldable (biList)
@@ -17,10 +17,10 @@ conditions = cycle [Infected, Healthy]
 
 
 createTree :: Int -> Int -> LeafTree Condition
-createTree arity leafCount = toStructure (Arity arity) $ take leafCount conditions
+createTree arity leafCount = toStructure (Degree arity) $ take leafCount conditions
 
 
-showStats :: (Arity, InfectionRate, PoolSize, Map.Map Int Likelihood) -> String
+showStats :: (Degree, InfectionRate, PoolSize, Map.Map Int Likelihood) -> String
 showStats (arity, rate, pool, d) =
     unlines
     [ unwords [show arity, ",", show rate, ",", show pool]
