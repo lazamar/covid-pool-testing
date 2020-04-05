@@ -10,13 +10,13 @@ import Control.Monad.State (State)
 import Control.Arrow ((&&&))
 import Data.Bifunctor (first, second)
 import Data.Fixed (Centi, showFixed)
-import Data.Foldable (fold, asum)
+import Data.Foldable (fold, asum, foldMap)
 import Data.Functor.Identity (Identity, runIdentity)
 import Data.List (permutations,foldl')
 import Data.Map (Map)
 import Data.Maybe (isJust, fromMaybe, mapMaybe)
 import Data.Tree (Tree(..), foldTree, drawTree)
-import Debug.Trace
+import Combinatorics
 
 import qualified Control.Monad.State as State
 import qualified Data.Set as Set
@@ -146,38 +146,14 @@ type Scenario = [Condition]
 
 type Structure = LeafTree Condition
 
--- | Scenarios where one person is infected, two people are infected, etc
--- All permutations of a scenario are counted as one
-combinatoricsScenarios :: PoolSize -> [Scenario]
-combinatoricsScenarios (PoolSize size) = do
-    infectedCount <- [0..size]
-    let healthyCount = size - infectedCount
-        infected     = take infectedCount $ repeat Infected
-        healthy      = take healthyCount  $ repeat Healthy
-    return (infected ++ healthy)
-
--- | O(n!) This is by far the slowest part of the program
--- All possible permutations
-generateScenarios :: PoolSize -> [Scenario]
-generateScenarios size =
-    concat $ noRepeats . permutations <$> combinatoricsScenarios size
-
--- | O(nlogn)
-noRepeats :: Ord a => [a] -> [a]
-noRepeats = Set.toList . Set.fromList
-
 -- | Likelihood of this scneario and all of its possible permutations
 combinatoricsLikelihood :: InfectionRate -> Scenario -> Likelihood
 combinatoricsLikelihood rate scenario =
     getLikelihood rate scenario * Likelihood possiblePermutations
     where
         infectedCount = length $ filter (== Infected) scenario
-        possiblePermutations =
-            factorial (length scenario) /
-                (factorial infectedCount * factorial (length scenario - infectedCount))
+        possiblePermutations = binomialCoefficient (length scenario) infectedCount
 
-factorial n = allFactorials !! n
-allFactorials = 1 : zipWith (*) [1..] allFactorials
 
 getLikelihood :: InfectionRate -> Scenario -> Likelihood
 getLikelihood (InfectionRate infectedRate) scenario =
@@ -259,7 +235,12 @@ assess :: Strategy s
     -> [(Degree, InfectionRate, PoolSize, Map Int Likelihood)]
 assess degrees rates sizes run = do
     size  <- sizes
-    let scenarios = generateScenarios size
+    let scenarios
+            = fmap fromPermutation
+            $ foldMap allPermutations
+            $ allCombinations [Healthy, Infected] s
+
+        PoolSize s = size
     degree <- degrees
     rate  <- rates
     let info = Info degree size rate
@@ -280,7 +261,7 @@ assessOneLevel :: Strategy s
     -> [(Degree, InfectionRate, PoolSize, Map Int Likelihood)]
 assessOneLevel sizes rates run = do
     size <- sizes
-    let scenarios  = combinatoricsScenarios size
+    let scenarios  = fromCombination <$> allCombinations [Healthy, Infected] s
         degree     = Degree s
         PoolSize s = size
     rate <- rates
@@ -291,6 +272,9 @@ assessOneLevel sizes rates run = do
         , size
         , probabilities run info $ (toStructure degree &&& combinatoricsLikelihood rate) <$> scenarios
         )
+
+-- sequentialApplication :: Int -> Map Int Likelihood -> Map Int -> Likelihood
+-- sequentialApplication count likelihoods =
 
 -------------------------------------------------------------------------------
 -- Strategies

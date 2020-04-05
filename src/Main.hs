@@ -8,17 +8,13 @@ import WorkIt
 main :: IO ()
 main = putStrLn
     $ unlines
-    [ tryIt runTestLeaves
-    , tryIt runTestAllNodes
-    , tryIt runTestIPChildren
-    ]
+    [ tryIt runTestIPChildren ]
     where
         tryIt :: Strategy s => (forall a. s a -> a) -> String
         tryIt run =
             let
-                arities = Degree <$> [2..7]
-                rates   = InfectionRate <$> [0.1]
-                pools   = PoolSize <$> [7]
+                rates   = InfectionRate <$> [0.2]
+                pools   = PoolSize      <$> [2..20]
             in
             unlines
                 [ "----------" <> run strategyName <> "---------------"

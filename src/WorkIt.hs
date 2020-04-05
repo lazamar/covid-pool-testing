@@ -29,7 +29,7 @@ showStats (arity, rate, pool, d) =
         ( show
         $ sum
         $ fmap snd
-        $ filter ((< 7) . fst)
+        $ filter ((< size) . fst)
         $ Map.toList d
         )
     ]
