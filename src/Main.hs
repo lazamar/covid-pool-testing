@@ -22,5 +22,5 @@ main = putStrLn
             in
             unlines
                 [ "----------" <> run strategyName <> "---------------"
-                , unlines $ showStats <$> assess arities rates pools run
+                , unlines $ showStats <$> assessOneLevel pools rates run
                 ]

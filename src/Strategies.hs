@@ -257,33 +257,40 @@ assess :: Strategy s
     -> [PoolSize]
     -> (forall a. s a -> a) -- ^ run the strategy
     -> [(Degree, InfectionRate, PoolSize, Map Int Likelihood)]
-assess arities rates sizes run = do
+assess degrees rates sizes run = do
     size  <- sizes
     let scenarios = generateScenarios size
-    arity <- arities
+    degree <- degrees
     rate  <- rates
-    let info = Info arity size rate
+    let info = Info degree size rate
     return $
-        ( arity
+        ( degree
         , rate
         , size
-        , probabilities run info $ (toStructure arity &&& getLikelihood rate) <$> scenarios
+        , probabilities run info $ (toStructure degree &&& getLikelihood rate) <$> scenarios
         )
 
 -- | An assessment routine where the tree Degree is always equal to the PoolSize
 --
 -- Performance-wise this is much much faster.
--- assessOneLevel :: Strategy s
---     -> [PoolSize]
---     -> [InfectionRate]
---     -> (forall a. s a -> a) -- ^ run the strategy
---     -> [(Degree, InfectionRate, PoolSize, Map Int Likelihood)]
--- assessOneLevel sizes rates run = do
---     size <- sizes
---     let scenarios = combinatoricsScenarios size
---     return []
-
-
+assessOneLevel :: Strategy s
+    => [PoolSize]
+    -> [InfectionRate]
+    -> (forall a. s a -> a) -- ^ run the strategy
+    -> [(Degree, InfectionRate, PoolSize, Map Int Likelihood)]
+assessOneLevel sizes rates run = do
+    size <- sizes
+    let scenarios  = combinatoricsScenarios size
+        degree     = Degree s
+        PoolSize s = size
+    rate <- rates
+    let info = Info degree size rate
+    return $
+        (degree
+        , rate
+        , size
+        , probabilities run info $ (toStructure degree &&& combinatoricsLikelihood rate) <$> scenarios
+        )
 
 -------------------------------------------------------------------------------
 -- Strategies
