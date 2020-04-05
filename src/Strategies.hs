@@ -149,7 +149,7 @@ type Structure = LeafTree Condition
 -- | Likelihood of this scneario and all of its possible permutations
 combinatoricsLikelihood :: InfectionRate -> Scenario -> Likelihood
 combinatoricsLikelihood rate scenario =
-    getLikelihood rate scenario * Likelihood possiblePermutations
+    getLikelihood rate scenario * Likelihood (fromIntegral possiblePermutations)
     where
         infectedCount = length $ filter (== Infected) scenario
         possiblePermutations = binomialCoefficient (length scenario) infectedCount

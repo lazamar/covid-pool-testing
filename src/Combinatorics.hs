@@ -1,9 +1,11 @@
+{-# LANGUAGE TupleSections #-}
 module Combinatorics where
 
 import Control.Monad (foldM)
-import Data.List (permutations)
+import Data.List (permutations, mapAccumR)
 
 import qualified Data.Set as Set
+import qualified Data.Map as Map
 
 
 newtype Combination a = Combination { fromCombination :: [a] }
@@ -12,9 +14,10 @@ newtype Combination a = Combination { fromCombination :: [a] }
 newtype Permutation a = Permutation { fromPermutation :: [a] }
     deriving (Show, Eq)
 
-binomialCoefficient :: Int -> Int -> Double
+-- | n choose k.
+binomialCoefficient :: Int -> Int -> Int
 binomialCoefficient n k =
-    fromIntegral (factorial n) / fromIntegral (factorial k * factorial (n - k))
+    (factorial n) `div` (factorial k * factorial (n - k))
 
 factorial :: Int -> Int
 factorial n = allFactorials !! n
@@ -45,7 +48,26 @@ allPermutations :: Ord a => Combination a -> [Permutation a]
 allPermutations (Combination list) =
     fmap Permutation $ noRepeats $ permutations list
 
+-- | How many different permutations of this list can we
+-- constructo taking into account that some of its elements
+-- are equal?
+permutationCount :: Ord a => Combination a -> Int
+permutationCount (Combination list)
+    = product
+    $ snd
+    $ mapAccumR
+        (\remainingSpaces count ->
+            ( remainingSpaces - count
+            , binomialCoefficient remainingSpaces count
+            )
+        )
+        (length list)
+    $ Map.elems occurrences
+    where
+        occurrences = Map.fromListWith (+) $ fmap (,1) list
 
 -- | O(nlogn)
 noRepeats :: Ord a => [a] -> [a]
 noRepeats = Set.toList . Set.fromList
+
+
