@@ -18,12 +18,11 @@ instance Arbitrary InfectionRate where
 instance Arbitrary PoolSize where
     arbitrary = PoolSize <$> suchThat arbitrary (\n -> n > 0 && n < maxSampleSize)
 
-fromProbability :: Probability -> Double
-fromProbability (Probability v) = v
-
-isEqualWithTolerance :: Double -> Double -> Double -> Bool
+isEqualWithTolerance :: Double -> Double -> Probability -> Bool
 isEqualWithTolerance tolerance reference result =
-    reference - tolerance < result && result < reference + tolerance
+    result > Probability (reference - tolerance)
+    &&
+    result < Probability (reference + tolerance)
 
 conditions :: [Condition]
 conditions = [minBound..]
@@ -37,7 +36,7 @@ main = hspec $ do
                  -- the innaccuracy of floating number arithmetic.
                  isEqualWithTolerance 0.01 1
                      $ sum
-                     $ fmap (fromProbability . getProbability rate . fromPermutation )
+                     $ fmap (pProbability (toProbabilityMap rate))
                      $ allPossibleScenarios size
 
          it "combinatoric likelihoods add up to 100%" $ do
@@ -46,7 +45,7 @@ main = hspec $ do
                  -- the innaccuracy of floating number arithmetic.
                  isEqualWithTolerance 0.01 1
                      $ sum
-                     $ fmap (fromProbability . combinatoricsProbability rate . fromCombination)
+                     $ fmap (cProbability (toProbabilityMap rate))
                      $ allCombinations conditions size
 
          xit "doesn't miss any scenario" $ do

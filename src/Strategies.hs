@@ -136,24 +136,6 @@ type Scenario = [Condition]
 
 type Structure = LeafTree Condition
 
--- | Probability of this scneario and all of its possible permutations
-combinatoricsProbability :: InfectionRate -> Scenario -> Probability
-combinatoricsProbability rate scenario =
-    getProbability rate scenario * Probability (fromIntegral possiblePermutations)
-    where
-        infectedCount = length $ filter (== Infected) scenario
-        possiblePermutations = binomialCoefficient (length scenario) infectedCount
-
-
-getProbability :: InfectionRate -> Scenario -> Probability
-getProbability (InfectionRate infectedRate) scenario =
-    Probability $ foldr (*) 1 $ fmap toRate scenario
-    where
-        healthyRate = 1 - infectedRate
-
-        toRate Healthy  = healthyRate
-        toRate Infected = infectedRate
-
 -- | Organise a scenario in a Tree of a specified arity
 toStructure :: Degree -> Scenario -> Structure
 toStructure (Degree arity) list = chunkIt $ fmap Leaf list
@@ -222,6 +204,13 @@ allPossibleScenarios  (PoolSize size)
     = foldMap allPermutations
     $ allCombinations [Healthy, Infected] size
 
+toProbabilityMap :: InfectionRate -> Map Condition Probability
+toProbabilityMap (InfectionRate r) =
+    Map.fromList
+        [ (Infected, Probability r)
+        , (Healthy , Probability (1 - r))
+        ]
+
 assess :: Strategy s
     => [Degree]
     -> [InfectionRate]
@@ -230,15 +219,16 @@ assess :: Strategy s
     -> [(Degree, InfectionRate, PoolSize, Map Int Probability)]
 assess degrees rates sizes run = do
     size  <- sizes
-    let scenarios = fromPermutation <$> allPossibleScenarios size
+    let scenarios = allPossibleScenarios size
     degree <- degrees
     rate  <- rates
     let info = Info degree size rate
+        pmap = toProbabilityMap rate
     return $
         ( degree
         , rate
         , size
-        , probabilities run info $ (toStructure degree &&& getProbability rate) <$> scenarios
+        , probabilities run info $ (toStructure degree . fromPermutation &&& pProbability pmap) <$> scenarios
         )
 
 -- | An assessment routine where the tree Degree is always equal to the PoolSize
@@ -251,16 +241,17 @@ assessOneLevel :: Strategy s
     -> [(Degree, InfectionRate, PoolSize, Map Int Probability)]
 assessOneLevel sizes rates run = do
     size <- sizes
-    let scenarios  = fromCombination <$> allCombinations [Healthy, Infected] s
+    let scenarios  = allCombinations [Healthy, Infected] s
         degree     = Degree s
         PoolSize s = size
     rate <- rates
     let info = Info degree size rate
+        pmap = toProbabilityMap rate
     return $
         (degree
         , rate
         , size
-        , probabilities run info $ (toStructure degree &&& combinatoricsProbability rate) <$> scenarios
+        , probabilities run info $ (toStructure degree . fromCombination &&& cProbability pmap) <$> scenarios
         )
 
 -- sequentialApplication :: Int -> Map Int Probability -> Map Int -> Probability
