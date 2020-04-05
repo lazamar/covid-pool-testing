@@ -1,6 +1,7 @@
 import Test.Hspec (Spec, describe, it, shouldBe, hspec, xdescribe, xit)
 import Test.QuickCheck (suchThat, property, vectorOf, Arbitrary, arbitrary, arbitraryBoundedEnum, NonEmptyList(..))
 import Strategies
+import Combinatorics
 import Data.Tree (Tree(..))
 
 maxSampleSize = 10
@@ -17,13 +18,15 @@ instance Arbitrary InfectionRate where
 instance Arbitrary PoolSize where
     arbitrary = PoolSize <$> suchThat arbitrary (\n -> n > 0 && n < maxSampleSize)
 
-fromLikelihood :: Likelihood -> Double
-fromLikelihood (Likelihood v) = v
+fromProbability :: Probability -> Double
+fromProbability (Probability v) = v
 
 isEqualWithTolerance :: Double -> Double -> Double -> Bool
 isEqualWithTolerance tolerance reference result =
     reference - tolerance < result && result < reference + tolerance
 
+conditions :: [Condition]
+conditions = [minBound..]
 
 main :: IO ()
 main = hspec $ do
@@ -34,17 +37,17 @@ main = hspec $ do
                  -- the innaccuracy of floating number arithmetic.
                  isEqualWithTolerance 0.01 1
                      $ sum
-                     $ fmap (fromLikelihood . getLikelihood rate)
-                     $ generateScenarios size
+                     $ fmap (fromProbability . getProbability rate . fromPermutation )
+                     $ allPossibleScenarios size
 
          it "combinatoric likelihoods add up to 100%" $ do
-             property $ \rate size ->
+             property $ \rate (PoolSize size) ->
                  -- We have some tolerance to account for
                  -- the innaccuracy of floating number arithmetic.
                  isEqualWithTolerance 0.01 1
                      $ sum
-                     $ fmap (fromLikelihood . combinatoricsLikelihood rate)
-                     $ combinatoricsScenarios size
+                     $ fmap (fromProbability . combinatoricsProbability rate . fromCombination)
+                     $ allCombinations conditions size
 
          xit "doesn't miss any scenario" $ do
             property $ do
@@ -52,7 +55,7 @@ main = hspec $ do
                 -- create a random scenario
                 scenario <- vectorOf n arbitrary
                 -- Make sure it appears in generateScenarios
-                return $ scenario `elem` generateScenarios (PoolSize n)
+                return $ Permutation scenario `elem` allPossibleScenarios (PoolSize n)
     describe "Result Tree" $ do
         it "is valid when everyone is tested" $
             let

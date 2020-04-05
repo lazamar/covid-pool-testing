@@ -1,8 +1,11 @@
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+
 module Combinatorics where
 
 import Control.Monad (foldM)
 import Data.List (permutations, mapAccumR)
+import Data.Fixed (Centi, showFixed)
 
 import qualified Data.Set as Set
 import qualified Data.Map as Map
@@ -13,6 +16,15 @@ newtype Combination a = Combination { fromCombination :: [a] }
 
 newtype Permutation a = Permutation { fromPermutation :: [a] }
     deriving (Show, Eq)
+
+newtype Probability = Probability Double
+    deriving (Eq, Num, Fractional)
+
+instance Show Probability where
+    show (Probability n) = "Probability " <> showAsPercentage n
+
+showAsPercentage :: Double -> String
+showAsPercentage n = showFixed True (fromRational $ toRational $ 100 * n :: Centi) <> "%"
 
 -- | n choose k.
 binomialCoefficient :: Int -> Int -> Int
@@ -69,5 +81,4 @@ permutationCount (Combination list)
 -- | O(nlogn)
 noRepeats :: Ord a => [a] -> [a]
 noRepeats = Set.toList . Set.fromList
-
 

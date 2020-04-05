@@ -9,7 +9,6 @@ module Strategies where
 import Control.Monad.State (State)
 import Control.Arrow ((&&&))
 import Data.Bifunctor (first, second)
-import Data.Fixed (Centi, showFixed)
 import Data.Foldable (fold, asum, foldMap)
 import Data.Functor.Identity (Identity, runIdentity)
 import Data.List (permutations,foldl')
@@ -124,21 +123,12 @@ newtype Degree = Degree Int
 newtype PoolSize = PoolSize Int
     deriving (Show, Eq)
 
--- | Likelihood of someone being infected as a number between 0 and 1
+-- | Probability of someone being infected as a number between 0 and 1
 newtype InfectionRate = InfectionRate  Double
     deriving (Eq)
 
 instance Show InfectionRate where
     show (InfectionRate n) = "InfectionRate " <> showAsPercentage n
-
-newtype Likelihood = Likelihood Double
-    deriving (Eq, Num, Fractional)
-
-instance Show Likelihood where
-    show (Likelihood n) = "Likelihood " <> showAsPercentage n
-
-showAsPercentage :: Double -> String
-showAsPercentage n = showFixed True (fromRational $ toRational $ 100 * n :: Centi) <> "%"
 
 -- | A Scenario is a certain amount of healthy and infected
 -- subjects in a particular order
@@ -146,18 +136,18 @@ type Scenario = [Condition]
 
 type Structure = LeafTree Condition
 
--- | Likelihood of this scneario and all of its possible permutations
-combinatoricsLikelihood :: InfectionRate -> Scenario -> Likelihood
-combinatoricsLikelihood rate scenario =
-    getLikelihood rate scenario * Likelihood (fromIntegral possiblePermutations)
+-- | Probability of this scneario and all of its possible permutations
+combinatoricsProbability :: InfectionRate -> Scenario -> Probability
+combinatoricsProbability rate scenario =
+    getProbability rate scenario * Probability (fromIntegral possiblePermutations)
     where
         infectedCount = length $ filter (== Infected) scenario
         possiblePermutations = binomialCoefficient (length scenario) infectedCount
 
 
-getLikelihood :: InfectionRate -> Scenario -> Likelihood
-getLikelihood (InfectionRate infectedRate) scenario =
-    Likelihood $ foldr (*) 1 $ fmap toRate scenario
+getProbability :: InfectionRate -> Scenario -> Probability
+getProbability (InfectionRate infectedRate) scenario =
+    Probability $ foldr (*) 1 $ fmap toRate scenario
     where
         healthyRate = 1 - infectedRate
 
@@ -192,8 +182,8 @@ testsUsed = foldTree $ \node children -> toNumber node + sum children
 probabilities :: Strategy s
     => (forall a. s a -> a) -- ^ run strategy
     -> Info
-    -> [(LeafTree Condition, Likelihood)]
-    -> Map Int Likelihood
+    -> [(LeafTree Condition, Probability)]
+    -> Map Int Probability
 probabilities run info scenarioTrees = Map.fromListWith (+) $ first eval <$> scenarioTrees
     where
         eval tree =
@@ -227,20 +217,20 @@ drawLeafTree  =  drawTree . toTree . fmap show
         toTree (LNode forest) = Node "" $ fmap toTree forest
         toTree (Leaf c      ) = Node c []
 
+allPossibleScenarios :: PoolSize -> [Permutation Condition]
+allPossibleScenarios  (PoolSize size)
+    = foldMap allPermutations
+    $ allCombinations [Healthy, Infected] size
+
 assess :: Strategy s
     => [Degree]
     -> [InfectionRate]
     -> [PoolSize]
     -> (forall a. s a -> a) -- ^ run the strategy
-    -> [(Degree, InfectionRate, PoolSize, Map Int Likelihood)]
+    -> [(Degree, InfectionRate, PoolSize, Map Int Probability)]
 assess degrees rates sizes run = do
     size  <- sizes
-    let scenarios
-            = fmap fromPermutation
-            $ foldMap allPermutations
-            $ allCombinations [Healthy, Infected] s
-
-        PoolSize s = size
+    let scenarios = fromPermutation <$> allPossibleScenarios size
     degree <- degrees
     rate  <- rates
     let info = Info degree size rate
@@ -248,7 +238,7 @@ assess degrees rates sizes run = do
         ( degree
         , rate
         , size
-        , probabilities run info $ (toStructure degree &&& getLikelihood rate) <$> scenarios
+        , probabilities run info $ (toStructure degree &&& getProbability rate) <$> scenarios
         )
 
 -- | An assessment routine where the tree Degree is always equal to the PoolSize
@@ -258,7 +248,7 @@ assessOneLevel :: Strategy s
     => [PoolSize]
     -> [InfectionRate]
     -> (forall a. s a -> a) -- ^ run the strategy
-    -> [(Degree, InfectionRate, PoolSize, Map Int Likelihood)]
+    -> [(Degree, InfectionRate, PoolSize, Map Int Probability)]
 assessOneLevel sizes rates run = do
     size <- sizes
     let scenarios  = fromCombination <$> allCombinations [Healthy, Infected] s
@@ -270,10 +260,10 @@ assessOneLevel sizes rates run = do
         (degree
         , rate
         , size
-        , probabilities run info $ (toStructure degree &&& combinatoricsLikelihood rate) <$> scenarios
+        , probabilities run info $ (toStructure degree &&& combinatoricsProbability rate) <$> scenarios
         )
 
--- sequentialApplication :: Int -> Map Int Likelihood -> Map Int -> Likelihood
+-- sequentialApplication :: Int -> Map Int Probability -> Map Int -> Probability
 -- sequentialApplication count likelihoods =
 
 -------------------------------------------------------------------------------

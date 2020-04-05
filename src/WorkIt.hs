@@ -3,8 +3,9 @@
 -- Functions to help me test this thing
 module WorkIt where
 
-import Strategies (Condition(..), LeafTree(..), ResultTree, toStructure, Degree(..), assess
-                  , InfectionRate(..), PoolSize(..), TestLeaves, Likelihood)
+import Strategies
+import Combinatorics
+
 import Control.Arrow ((***))
 import Data.Bifoldable (biList)
 import Data.List (intersperse)
@@ -20,7 +21,7 @@ createTree :: Int -> Int -> LeafTree Condition
 createTree arity leafCount = toStructure (Degree arity) $ take leafCount conditions
 
 
-showStats :: (Degree, InfectionRate, PoolSize, Map.Map Int Likelihood) -> String
+showStats :: (Degree, InfectionRate, PoolSize, Map.Map Int Probability) -> String
 showStats (arity, rate, pool, d) =
     unlines
     [ unwords [show arity, ",", show rate, ",", show pool]
