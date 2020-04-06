@@ -28,16 +28,14 @@ showAsPercentage :: Rational -> String
 showAsPercentage n = showFixed True (fromRational $ toRational $ 100 * n :: Centi) <> "%"
 
 -- | n choose k.
-binomialCoefficient :: Int -> Int -> Int
-binomialCoefficient n k =
-    fromIntegral $ (factorial n) `div` (factorial k * factorial (n - k))
+binomialCoefficient :: Int -> Int -> Integer
+binomialCoefficient n k = pascalsTriangle !! n !! k
 
-factorial :: Int -> Integer
-factorial n = allFactorials !! n
-
--- | Memoised list of all existing factorials
-allFactorials :: [Integer]
-allFactorials = 1 : zipWith (*) [1..] allFactorials
+-- | Memoised Pascal's Triangle
+pascalsTriangle :: [[Integer]]
+pascalsTriangle = iterate next [1]
+    where
+        next ns = zipWith (+) (0:ns) $ ns ++[0]
 
 -- | Slow
 allCombinations :: Ord a => [a] -> Int -> [Combination a]
@@ -64,7 +62,7 @@ allPermutations (Combination list) =
 -- | How many different permutations of this list can we
 -- constructo taking into account that some of its elements
 -- are equal?
-permutationCount :: Ord a => Combination a -> Int
+permutationCount :: Ord a => Combination a -> Integer
 permutationCount (Combination list)
     = product
     $ snd
