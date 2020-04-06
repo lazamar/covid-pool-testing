@@ -12,32 +12,31 @@ import Data.Map (Map)
 import qualified Data.Set as Set
 import qualified Data.Map as Map
 
-
 newtype Combination a = Combination { fromCombination :: [a] }
     deriving (Show, Eq)
 
 newtype Permutation a = Permutation { fromPermutation :: [a] }
     deriving (Show, Eq)
 
-newtype Probability = Probability { fromProbability :: Double }
+newtype Probability = Probability { fromProbability :: Rational }
     deriving newtype (Eq, Num, Fractional, Ord)
 
 instance Show Probability where
     show (Probability n) = "Probability " <> showAsPercentage n
 
-showAsPercentage :: Double -> String
+showAsPercentage :: Rational -> String
 showAsPercentage n = showFixed True (fromRational $ toRational $ 100 * n :: Centi) <> "%"
 
 -- | n choose k.
 binomialCoefficient :: Int -> Int -> Int
 binomialCoefficient n k =
-    (factorial n) `div` (factorial k * factorial (n - k))
+    fromIntegral $ (factorial n) `div` (factorial k * factorial (n - k))
 
-factorial :: Int -> Int
+factorial :: Int -> Integer
 factorial n = allFactorials !! n
 
 -- | Memoised list of all existing factorials
-allFactorials :: [Int]
+allFactorials :: [Integer]
 allFactorials = 1 : zipWith (*) [1..] allFactorials
 
 -- | Slow

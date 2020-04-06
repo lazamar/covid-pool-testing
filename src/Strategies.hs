@@ -124,7 +124,7 @@ newtype PoolSize = PoolSize Int
     deriving (Show, Eq)
 
 -- | Probability of someone being infected as a number between 0 and 1
-newtype InfectionRate = InfectionRate  Double
+newtype InfectionRate = InfectionRate Rational
     deriving (Eq)
 
 instance Show InfectionRate where
@@ -254,8 +254,18 @@ assessOneLevel sizes rates run = do
         , probabilities run info $ (toStructure degree . fromCombination &&& cProbability pmap) <$> scenarios
         )
 
--- sequentialApplication :: Int -> Map Int Probability -> Map Int -> Probability
--- sequentialApplication count likelihoods =
+-- | Given the probabilities of needing certain amounts of tests for
+-- a given group, give me all possible test usages and their probabilities
+-- if I tested a certain number of groups
+sequentialApplication :: Int -> Map Int Probability -> Map Int Probability
+sequentialApplication groupCount probabilities
+    = Map.fromListWith (+)
+    $ fmap (testsCount &&& cProbability probabilities)
+    $ flip allCombinations groupCount
+    $ Map.keys probabilities
+    where
+        testsCount :: Combination Int -> Int
+        testsCount (Combination numbers) = sum numbers
 
 -------------------------------------------------------------------------------
 -- Strategies
