@@ -121,11 +121,11 @@ newtype Degree = Degree Int
     deriving (Show, Eq)
 
 newtype PoolSize = PoolSize Int
-    deriving (Show, Eq)
+    deriving (Show, Eq, Ord)
 
 -- | Probability of someone being infected as a number between 0 and 1
 newtype InfectionRate = InfectionRate Rational
-    deriving (Eq)
+    deriving (Eq, Ord)
 
 instance Show InfectionRate where
     show (InfectionRate n) = "InfectionRate " <> showAsPercentage n
@@ -233,7 +233,8 @@ assess degrees rates sizes run = do
 
 -- | An assessment routine where the tree Degree is always equal to the PoolSize
 --
--- Performance-wise this is much much faster.
+-- Performance-wise this is much much faster, but there is only one
+-- sensible strategy possible in this scenario
 assessOneLevel :: Strategy s
     => [PoolSize]
     -> [InfectionRate]
@@ -257,8 +258,8 @@ assessOneLevel sizes rates run = do
 -- | Given the probabilities of needing certain amounts of tests for
 -- a given group, give me all possible test usages and their probabilities
 -- if I tested a certain number of groups
-sequentialApplication :: Int -> Map Int Probability -> Map Int Probability
-sequentialApplication groupCount probabilities
+sequentialApplications :: Int -> Map Int Probability -> Map Int Probability
+sequentialApplications groupCount probabilities
     = Map.fromListWith (+)
     $ fmap (testsCount &&& cProbability probabilities)
     $ flip allCombinations groupCount
