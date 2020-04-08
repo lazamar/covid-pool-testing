@@ -118,7 +118,7 @@ noop _ = return ()
 -- Generating Scenarios
 
 newtype Degree = Degree Int
-    deriving (Show, Eq)
+    deriving (Show, Eq, Ord)
 
 newtype PoolSize = PoolSize Int
     deriving (Show, Eq, Ord)
@@ -218,18 +218,22 @@ assess :: Strategy s
     -> (forall a. s a -> a) -- ^ run the strategy
     -> [(Degree, InfectionRate, PoolSize, Map Int Probability)]
 assess degrees rates sizes run = do
-    size  <- sizes
+    size@(PoolSize s) <- sizes
     let scenarios = allPossibleScenarios size
-    degree <- degrees
+    degree@(Degree d) <- degrees
     rate  <- rates
     let info = Info degree size rate
         pmap = toProbabilityMap rate
-    return $
-        ( degree
-        , rate
-        , size
-        , probabilities run info $ (toStructure degree . fromPermutation &&& pProbability pmap) <$> scenarios
-        )
+
+    case compare d s of
+        GT -> []
+        EQ -> assessOneLevel [size] [rate] run
+        LT -> return $
+            ( degree
+            , rate
+            , size
+            , probabilities run info $ (toStructure degree . fromPermutation &&& pProbability pmap) <$> scenarios
+            )
 
 -- | An assessment routine where the tree Degree is always equal to the PoolSize
 --
@@ -249,7 +253,7 @@ assessOneLevel sizes rates run = do
     let info = Info degree size rate
         pmap = toProbabilityMap rate
     return $
-        (degree
+        ( degree
         , rate
         , size
         , probabilities run info $ (toStructure degree . fromCombination &&& cProbability pmap) <$> scenarios
