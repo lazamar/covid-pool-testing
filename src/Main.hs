@@ -15,14 +15,14 @@ import qualified Data.Map as Map
 
 main :: IO ()
 main =
-    writeFile "stats.csv"
+    writeFile "plots/stats-0.csv"
         $ toCsv
         $ fmap (populationStats population)
         $ complex
     where
         pools   = PoolSize <$> [2..4]
         degrees = Degree   <$> [2]
-        rates   = InfectionRate <$> [0.05, 0.1..0.30]
+        rates   = InfectionRate <$> [0.05]
 
         -- | A number divisible by all pool sizes
         population = Population $ foldr lcm 1 $ fromPoolSize <$> pools
