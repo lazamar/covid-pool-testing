@@ -7,7 +7,8 @@ import matplotlib.ticker as ticker
 import math
 import csv
 
-rcParams['font.family'] = 'serif'
+# rcParams['font.family'] = 'serif'
+rcParams['font.size'] = 7
 linewidth=0.9
 
 target = { "InfectionRate": 0.2 , "GroupSize": 3, "TreeDegree": 3 }
@@ -58,18 +59,16 @@ def colId(scenario):
     return scenario['dict']['InfectionRate']
 
 def colNumber(columns, scenario):
-    return columns[colId(scenario)]
+    return 1 + columns.index(colId(scenario))
 
 # Create a mapping from colId to column number
 def createColumns(scenarios):
-    maxCol=0
-    columns = {}
+    columns = set([])
     for _, scenario in scenarios.iteritems():
-        col = colId(scenario)
-        if not(col in columns):
-            maxCol += 1
-            columns[col] = maxCol
-    return (maxCol, columns)
+        columns.add(colId(scenario))
+
+    maxCol = len(columns)
+    return (maxCol, sorted(list(columns)))
 
 def rowId(scenario):
     return str(scenario['dict']['GroupSize']) + str(scenario['dict']['TreeDegree'])
@@ -92,10 +91,13 @@ def createRows(scenarios, columns):
     rows = {}
     maxRow = 0
     for col, vals in row_sets.iteritems():
-        rows[col] = list(vals)
+        rows[col] = sorted(list(vals))
         maxRow = max(maxRow, len(vals))
 
     return (maxRow, rows)
+
+def asPercentage (n):
+    return str(int(100 * n)) + "%"
 
 
 with open('plots/stats-0.csv') as csv_file:
@@ -124,25 +126,35 @@ with open('plots/stats-0.csv') as csv_file:
 
     (maxCol, columns) = createColumns(scenarios)
     (maxRow, rows)    = createRows(scenarios, columns)
+    totalPopulation = stats[0]["Population"]
 
     # Data for plotting
-    fig, ax = plt.subplots()
+    fig, axs = plt.subplots()
     for key, scenario in scenarios.iteritems():
         ix = colNumber(columns, scenario) + (rowNumber(rows, scenario) - 1) * maxCol
         ax = plt.subplot(maxRow, maxCol, ix)
+        ax.set_xlim([0,totalPopulation * 1.5])
         ax.set(
-            title='Group of '
-                + str(scenario['dict']["GroupSize"])
-                + ', tree degree of '
-                + str(scenario['dict']["TreeDegree"])
-                + ', infection rate of'
-                + str(scenario['dict']["InfectionRate"])
+            title='Groups of: ' + str(scenario['dict']["GroupSize"])
+                # + ', T: ' + str(scenario['dict']["TreeDegree"])
+                + ', Infection Rate: ' + asPercentage(scenario['dict']["InfectionRate"])
         )
         ax.yaxis.set_major_formatter(ticker.PercentFormatter(xmax=1))
+        ax.xaxis.set_major_formatter(ticker.FuncFormatter(
+            lambda x, pos: asPercentage(x / totalPopulation)
+        ))
+        ax.grid()
         drawGraph(ax, scenario)
 
 
-    plt.legend(loc='lower right')
-    plt.grid()
+
+    fig.suptitle("Probability of using N tests in a population of " + str(totalPopulation) + " subjects")
+    for ax in fig.get_axes():
+        ax.set(xlabel='Tests used', ylabel='Probability')
+
+    for ax in fig.get_axes():
+        ax.label_outer()
+
+    plt.subplots_adjust(wspace=None, hspace=.5)
     plt.show()
 

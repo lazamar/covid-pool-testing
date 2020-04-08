@@ -18,15 +18,15 @@ main =
     writeFile "plots/stats-0.csv"
         $ toCsv
         $ fmap (populationStats population)
-        $ complex
+        $ simple
     where
-        pools   = PoolSize <$> [3]
-        degrees = Degree   <$> [3]
-        rates   = InfectionRate <$> [0.2]
+        pools   = PoolSize <$> [2..6]
+        degrees = Degree   <$> [2..6]
+        rates   = InfectionRate <$> [0.15, 0.2, 0.25, 0.3]
 
         -- | A number divisible by all pool sizes
-        --population = Population $ foldr lcm 1 $ fromPoolSize <$> pools
-        population = Population 100
+        population = Population $ foldr lcm 1 $ fromPoolSize <$> pools
+        --population = Population 100
 
         simple  = assessOneLevel pools rates runTestIPChildren
         complex = assess degrees rates pools runTestIPChildren
