@@ -20,12 +20,13 @@ main =
         $ fmap (populationStats population)
         $ complex
     where
-        pools   = PoolSize <$> [2..4]
-        degrees = Degree   <$> [2]
-        rates   = InfectionRate <$> [0.05]
+        pools   = PoolSize <$> [3]
+        degrees = Degree   <$> [3]
+        rates   = InfectionRate <$> [0.2]
 
         -- | A number divisible by all pool sizes
-        population = Population $ foldr lcm 1 $ fromPoolSize <$> pools
+        --population = Population $ foldr lcm 1 $ fromPoolSize <$> pools
+        population = Population 100
 
         simple  = assessOneLevel pools rates runTestIPChildren
         complex = assess degrees rates pools runTestIPChildren
