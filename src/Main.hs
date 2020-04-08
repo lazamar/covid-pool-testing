@@ -6,34 +6,29 @@ import Combinatorics
 import Strategies
 import WorkIt
 
+import Data.Fixed (Centi, showFixed)
 import Data.Map (Map)
 import Data.List (intersperse, sortBy)
 import System.IO (writeFile)
 
 import qualified Data.Map as Map
 
-populationToTest = Population 100
-thresholdTestCount = 90
-
 main :: IO ()
 main =
     writeFile "stats.csv"
-        $ toCsv thresholdTestCount
-        $ fmap (populationStats populationToTest)
+        $ toCsv
+        $ fmap (populationStats population)
         $ complex
     where
-        rates  = InfectionRate <$> [0.05, 0.1..0.30]
+        pools   = PoolSize <$> [2..4]
+        degrees = Degree   <$> [2]
+        rates   = InfectionRate <$> [0.05, 0.1..0.30]
 
-        -- simple =
-        --     let pools   = PoolSize      <$> [2..20]
-        --     in
-        --     assessOneLevel pools rates runTestIPChildren
+        -- | A number divisible by all pool sizes
+        population = Population $ foldr lcm 1 $ fromPoolSize <$> pools
 
-        complex =
-            let pools = PoolSize <$> [2..7]
-                degrees = Degree <$> [2..7]
-            in
-            assess degrees rates pools runTestIPChildren
+        simple  = assessOneLevel pools rates runTestIPChildren
+        complex = assess degrees rates pools runTestIPChildren
 
 
 showStats' res@(Degree degree,_,_,prob) =
@@ -67,28 +62,37 @@ newtype Population = Population Int
 
 type Row = (Population, InfectionRate, PoolSize, Degree, Map Int Probability)
 
-toCsv :: Int -> [Row] -> String
-toCsv threshold rows
+toCsv :: [Row] -> String
+toCsv rows
   = unlines
     $ fmap (concat . intersperse ",")
-    $ (:) [ "Population"
+    $ (:)
+        [ "Population"
         , "InfectionRate"
-        , "Group size"
-        , "Tree degree"
-        , "Probability of using less than " <> show threshold <> " tests"
+        , "GroupSize" -- PoolSize
+        , "TreeDegree"
+        , "TestsUsed"
+        , "Probability"
         ]
-    $ fmap toRow
+    $ foldMap toRow
     $ sortBy (\(_,r1,_,_,_) (_,r2,_,_,_) -> compare r1 r2 )
     $ sortBy (\(_,_,s1,_,_) (_,_,s2,_,_) -> compare s1 s2 )
     $ sortBy (\(_,_,_,d1,_) (_,_,_,d2,_) -> compare d1 d2 )
     $ rows
 
     where
-        toRow (Population population, InfectionRate i, PoolSize s, Degree d, probs) =
-            let Probability p = probabilityOfUsingLessThanNTests threshold probs
-            in
-            [show population, showAsPercentage i, show s, show d, showAsPercentage p]
+        toRow (Population population, InfectionRate rate, PoolSize size, Degree degree, probs) = do
+            (testsUsed, Probability probability) <- Map.toList probs
+            return
+                [ show population
+                , showTwoDecimalPlaces rate
+                , show size
+                , show degree
+                , show testsUsed
+                , showTwoDecimalPlaces probability
+                ]
 
+showTwoDecimalPlaces n = showFixed True (fromRational $ toRational n :: Centi)
 
 probabilityOfUsingLessThanNTests :: Int -> Map Int Probability -> Probability
 probabilityOfUsingLessThanNTests n probs

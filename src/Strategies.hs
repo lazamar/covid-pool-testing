@@ -120,7 +120,7 @@ noop _ = return ()
 newtype Degree = Degree Int
     deriving (Show, Eq, Ord)
 
-newtype PoolSize = PoolSize Int
+newtype PoolSize = PoolSize { fromPoolSize :: Int }
     deriving (Show, Eq, Ord)
 
 -- | Probability of someone being infected as a number between 0 and 1
