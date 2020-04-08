@@ -54,6 +54,50 @@ def drawGraph(ax, scenario):
         label="Up to n tests"
     )
 
+def colId(scenario):
+    return scenario['dict']['InfectionRate']
+
+def colNumber(columns, scenario):
+    return columns[colId(scenario)]
+
+# Create a mapping from colId to column number
+def createColumns(scenarios):
+    maxCol=0
+    columns = {}
+    for _, scenario in scenarios.iteritems():
+        col = colId(scenario)
+        if not(col in columns):
+            maxCol += 1
+            columns[col] = maxCol
+    return (maxCol, columns)
+
+def rowId(scenario):
+    return str(scenario['dict']['GroupSize']) + str(scenario['dict']['TreeDegree'])
+
+def rowNumber(rows, scenario):
+    return 1 + rows[colId(scenario)].index(rowId(scenario))
+
+# Create a mapping from colId rowId to row number
+def createRows(scenarios, columns):
+    maxCol=1
+    row_sets = {}
+    for _, scenario in scenarios.iteritems():
+        col = colId(scenario)
+        row = rowId(scenario)
+        if not(col in row_sets ):
+            row_sets[col] = set([])
+        row_sets[col].add(row)
+
+
+    rows = {}
+    maxRow = 0
+    for col, vals in row_sets.iteritems():
+        rows[col] = list(vals)
+        maxRow = max(maxRow, len(vals))
+
+    return (maxRow, rows)
+
+
 with open('plots/stats-0.csv') as csv_file:
     stats = []
     for d in csv.DictReader(csv_file):
@@ -77,22 +121,27 @@ with open('plots/stats-0.csv') as csv_file:
 
         scenarios[key]['values'].append(d)
 
+
+    (maxCol, columns) = createColumns(scenarios)
+    (maxRow, rows)    = createRows(scenarios, columns)
+
     # Data for plotting
     fig, ax = plt.subplots()
-    for key in scenarios:
-        scenario = scenarios[key]
-        if not(isTarget(scenario['dict'])):
-            continue
+    for key, scenario in scenarios.iteritems():
+        ix = colNumber(columns, scenario) + (rowNumber(rows, scenario) - 1) * maxCol
+        ax = plt.subplot(maxRow, maxCol, ix)
+        ax.set(
+            title='Group of '
+                + str(scenario['dict']["GroupSize"])
+                + ', tree degree of '
+                + str(scenario['dict']["TreeDegree"])
+                + ', infection rate of'
+                + str(scenario['dict']["InfectionRate"])
+        )
+        ax.yaxis.set_major_formatter(ticker.PercentFormatter(xmax=1))
         drawGraph(ax, scenario)
 
 
-    ax.set(
-        xlabel='Tests used',
-        ylabel='Probability',
-        title='Amount of tests needed on a population of ' + str(stats[0]["Population"]) + ' subjects'
-    )
-
-    ax.yaxis.set_major_formatter(ticker.PercentFormatter(xmax=1))
     plt.legend(loc='lower right')
     plt.grid()
     plt.show()
